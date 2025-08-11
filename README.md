@@ -1,6 +1,32 @@
 # AppSecHub
 
-AppSecHub is a Go starter kit for building HTTP services, following a clear layered architecture (Domain → UseCase → Interface/HTTP → Infrastructure) with foundational security practices (password hashing, JWT, migrations, environment-driven config).
+[![Go version](https://img.shields.io/badge/go-1.24+-blue)](https://go.dev)
+[![Build](https://img.shields.io/badge/build-passing-brightgreen)](#)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+AppSecHub is an application security platform to centralize and manage all AppSec concerns across your software portfolio. It provides a clean Go backend foundation (Domain → UseCase → Interface/HTTP → Infrastructure) with strong security defaults (hashed passwords, JWT with `iss`/`aud`/`nbf`/leeway, DB migrations, env-driven config) and is designed to evolve into a full platform.
+
+## Vision & scope
+- Vulnerability management: ingestion, normalization, triage, SLA, dashboards
+- CI/CD security findings: pipeline runs, policy breaches, shift-left workflows
+- Pentest findings: evidence, assignments, dedup across sources
+- Supply chain risks: SCA and container scanning, dependency health
+- SBOM management: CycloneDX/SPDX ingestion, components, licenses, VEX (future)
+- Integrations: SCM/CI (GitHub/GitLab/Jenkins), scanners (SAST/DAST/SCA), Jira/Slack
+
+Initial codebase ships a secure, production-ready skeleton (auth, RBAC, rate limit, logging, CORS, migrations) to accelerate building these modules.
+
+## Initial roadmap
+- Phase 1 (MVP)
+  - Projects/Applications, RBAC/SSO, audit logs
+  - Findings ingestion (SARIF for SAST, CycloneDX for SBOM/SCA), normalization & dedup
+  - Triage workflow (assign/status/SLA), basic dashboards and webhooks
+- Phase 2
+  - DAST/Pentest ingestion (ZAP/Burp), richer integrations (Jira issue sync)
+  - Policy engine (severity remap, gating), advanced reporting/exports
+- Phase 3
+  - Supply chain advanced (VEX, license compliance), external search if needed
+  - Scalability (queues, background jobs), HA/backup, multi-region options
 
 ## Architecture diagrams
 - Project layout (directories): see section "Project layout"
@@ -88,10 +114,6 @@ Handler returns HTTP Response
 Default API base URL: `http://localhost:8080`
 
 ## Testing
-
-[![Go version](https://img.shields.io/badge/go-1.24+-blue)](https://go.dev)
-[![Build](https://img.shields.io/badge/build-passing-brightgreen)](#)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ### Unit tests
 - Run all unit tests:
