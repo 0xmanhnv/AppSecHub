@@ -26,6 +26,7 @@ func registerAuthRoutes(v1 *gin.RouterGroup, userHandler *handler.UserHandler, c
 			logger.L().Warn("login_rate_limit_in_memory", "note", "in-memory limiter is per-instance; consider Redis for multi-instance", "env", cfg.Env)
 		}
 		login := auth.Group("")
+		// Per-IP limiter at group-level (does not need DTO)
 		login.Use(middleware.RateLimitForPath("/v1/auth/login", cfg.HTTP.LoginRateLimitRPS, cfg.HTTP.LoginRateLimitBurst))
 		if cfg.RedisAddr != "" {
 			rl := ratelimit.NewRedisLimiter(cfg.RedisAddr, cfg.RedisPassword, cfg.RedisDB).WithFailClosed(cfg.HTTP.LoginRateLimitFailClosed)
@@ -39,9 +40,15 @@ func registerAuthRoutes(v1 *gin.RouterGroup, userHandler *handler.UserHandler, c
 				}
 				return ""
 			}
-			login.Use(rl.LimitEmail(cfg.HTTP.LoginRateLimitRPS, cfg.HTTP.LoginRateLimitBurst, extract))
+			// Order matters: bind/validate JSON first → extract email → apply per-email limiter → handler
+			login.POST("/login",
+				middleware.ValidateJSON[dto.LoginRequest]("req", cfg.HTTP.MaxBodyBytes),
+				rl.LimitEmail(cfg.HTTP.LoginRateLimitRPS, cfg.HTTP.LoginRateLimitBurst, extract),
+				userHandler.Login,
+			)
+		} else {
+			login.POST("/login", middleware.ValidateJSON[dto.LoginRequest]("req", cfg.HTTP.MaxBodyBytes), userHandler.Login)
 		}
-		login.POST("/login", middleware.ValidateJSON[dto.LoginRequest]("req", cfg.HTTP.MaxBodyBytes), userHandler.Login)
 	} else {
 		auth.POST("/login", middleware.ValidateJSON[dto.LoginRequest]("req", cfg.HTTP.MaxBodyBytes), userHandler.Login)
 	}

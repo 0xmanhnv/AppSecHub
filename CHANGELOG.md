@@ -1,5 +1,20 @@
 ## Changelog
 
+### Unreleased
+
+- security,jwt: always set `typ=JWT` header; enforce KID when multiple RS256/EdDSA public keys (fallback only when a single key is configured).
+- http,auth: standardize 401 responses using response helpers; attach `WWW-Authenticate` details.
+- rate-limit: standardize 429 envelope `{ error: { code: "too_many_requests", message: "too many requests" } }` with `Retry-After` and `X-RateLimit-*` headers for both in-memory and Redis limiters; add `CodeTooManyRequests` and helper.
+- limiter(redis): per-email rate limit after normalization (trim/lower) and SHA256 hashing to protect PII; optional fail-closed via `HTTP_LOGIN_RATELIMIT_FAIL_CLOSED`.
+- i18n: YAML-driven catalogs (`configs/locales`), locale middleware (`Accept-Language`), thread-safe rendering with fallback.
+- validation: custom tags `strict_email`, `strong_password`; JSON field names in errors; rich `error.details` mapping; 413 handling for oversized bodies.
+- router: split into `internal/interfaces/http/router/*` by concern (base/health/auth/admin); keep `internal/interfaces/http/route.go` as thin facade (`http.NewRouter`).
+- jwt: configurable algorithms via env (`JWT_ALG` HS256/RS256/EdDSA), KID, key paths/dirs; verify against configured algorithms & public keys.
+- refresh-tokens: map `redis.Nil` → `ErrInvalidRefreshToken`; idempotent revoke.
+- bcrypt: `Hash` returns `(string, error)`; cost via `BCRYPT_COST`.
+
+## Changelog
+
 ## Unreleased
 - Observability: add `/metrics` (Prometheus), enable pprof in dev, optional OpenTelemetry tracing for HTTP and DB.
 - CI/CD: add GitHub Actions (build, lint, unit + integration tests, govulncheck), optional Trivy image scan.

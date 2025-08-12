@@ -5,6 +5,10 @@
   - Add pprof (dev-only)
   - Consider OpenTelemetry tracing for HTTP and DB
 
+- JWT public key distribution
+  - Add JWKS endpoint for RS256/EdDSA public keys (derive `kid` from filename; serve cacheable set)
+  - Enforce `kid` when multiple verification keys present (DONE in code); document rotation runbook
+
 - Testing & CI
   - GitHub Actions: build, test, lint, govulncheck
   - Container image scanning (e.g., Trivy)
@@ -26,7 +30,7 @@
   - Manual wiring (DB → repo → hasher/JWT → usecases → handler → router)
   - Split `main` into dedicated bootstrap helpers: `initPostgresAndMigrate`, `initJWTService`, `buildUserComponents`, `loadRBACPolicy`, `buildRouter`
   - Usecases: CreateUser, Login + handler/router
-  - JWT claims include role; JWTAuth middleware, RequireRoles/RequirePermissions (RBAC)
+- JWT claims include role; JWTAuth middleware, RequireRoles/RequirePermissions (RBAC)
   - In-memory RBAC policy + YAML load (`RBAC_POLICY_PATH`) and warnings for unknown roles
   - Response envelope + basic domain error mapping; repo timeouts + map `sql.ErrNoRows`/`23505`
   - CORS/Trusted proxies from env; RequestID UUIDv4 + structured logging (slog)
@@ -39,6 +43,7 @@
 - Grouped auth routes in `registerAuthRoutes` (includes `/register`, `/login` and protected `/me`, `/change-password`); removed `registerAuthLogin`.
 - Friendly JSON binding errors: empty body → "request body is empty"; malformed JSON → "malformed JSON at position N"; wrong type → "invalid type for field <field>".
 - JWT: set `NotBefore=now` on token issue; during validation, if `now + leeway < nbf` return `token not yet valid` (reduces clock skew effects).
+- JWT: algorithms configurable (HS256/RS256/EdDSA), always set `typ=JWT`; require `kid` when multiple public keys; load keys from env/path/dir
 - Router API: consolidated to a single `NewRouter(userHandler, cfg, authMiddleware...)`.
 - Graceful shutdown: `http.Server` (`ReadHeaderTimeout=5s`, `IdleTimeout=60s`) + `Shutdown(15s)` on `SIGINT/SIGTERM`; close `sqlDB` after stop.
 - Logger: global default logger (`logger.Init` once at entrypoint, use `logger.L()` everywhere; `SetLevel` to adjust at runtime). Avoid per-file new loggers.

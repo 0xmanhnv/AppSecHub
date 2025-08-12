@@ -40,9 +40,11 @@ Initial codebase ships a secure, production-ready skeleton (auth, RBAC, rate lim
 ```txt
 HTTP Request (Gin)
     ↓
-Base middlewares: JSONRecovery → RequestID → (Logger+SecurityHeaders if enabled) → CORS
+Base middlewares: JSONRecovery → RequestID → (Logger+SecurityHeaders if enabled) → LocaleMiddleware → CORS
     ↓
-Route match (Gin) + optional RateLimit for /v1/auth/login
+Route match (Gin)
+    ├─► (Optional) RateLimit per-IP (in-memory) for /v1/auth/login
+    └─► (Optional) RateLimit per-email (Redis) for /v1/auth/login (applied after ValidateJSON)
     ↓
 Handler (UserHandler)
     ↓
@@ -334,7 +336,7 @@ Client
   │                  ├─ Check Authorization header present
   │                  ├─ Extract Bearer token
   │                  ├─ Validate via TokenValidator → JWTService.ValidateToken
-  │                  │     ├─ Verify signature (HS256), iat, exp, nbf(+leeway)
+  │                  │     ├─ Verify signature (HS256/RS256/EdDSA), iat, exp, nbf(+leeway)
   │                  │     ├─ Optional issuer/audience checks
   │                  │     └─ Return claims { sub=user_id, role }
   │                  ├─ Set context: user_id, user_role
@@ -359,7 +361,7 @@ config.Load
   → (optional) seedInitialUser
   → loadRBACPolicy (YAML)
   → buildUserComponents (repo, hasher, usecases, handlers)
-  → NewRouter(userHandler, cfg, JWTAuth(validator)) + AddReadiness
+    → http.NewRouter(userHandler, cfg, JWTAuth(validator)) + AddReadiness
   → http.Server + graceful shutdown (SIGINT/SIGTERM)
 ```
 
@@ -436,10 +438,19 @@ go mod tidy && go build ./...
 
 ## Security recommendations
 - Password hashing with bcrypt (integrated); increase cost appropriately for production.
-- Manage `JWT_SECRET` with a secret manager; use short TTL; consider refresh tokens/rotation.
+- Manage JWT keys with a secret manager; use short TTL; consider refresh tokens/rotation.
+- JWT algorithms: configurable via `JWT_ALG` (HS256/RS256/EdDSA). When RS256/EdDSA:
+  - Set `JWT_KID` for the signing key; tokens include `typ=JWT` and `kid` header.
+  - Provide private key by `JWT_PRIVATE_KEY_PATH` (or `JWT_PRIVATE_KEY_PEM` for dev) and verification keys under `JWT_PUBLIC_KEYS_DIR` (filename without extension is treated as kid).
+  - Verification enforces the configured algorithm; if multiple public keys are present, KID is required; when a single key exists, fallback is allowed.
+  - Consider exposing a JWKS endpoint for key distribution (planned).
 - Enable CORS appropriately, add security headers (HSTS when HTTPS, X-Content-Type-Options, Referrer-Policy, X-Frame-Options).
 - Content Security Policy (CSP): default applied by middleware: `default-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'`. Adjust per frontend needs.
 - Structured logging with a `request-id`; never log secrets or sensitive data.
+
+### HTTP error envelope
+- 401 Unauthorized via middleware and handlers standardized using `response` helpers; `WWW-Authenticate` header set with error hints.
+- 429 Too Many Requests returns envelope `{ error: { code: "too_many_requests", message: "too many requests" } }` with `Retry-After` and `X-RateLimit-*` headers.
 
 ### Logging guidance
 - Initialize once at entrypoint with `logger.Init(...)` and use `logger.L()` everywhere else.

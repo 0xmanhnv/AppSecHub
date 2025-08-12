@@ -13,12 +13,17 @@ import (
 	"strings"
 	"time"
 
+	"encoding/base64"
+	"math/big"
+
 	"github.com/golang-jwt/jwt/v5"
 )
 
 type JWTService interface {
 	GenerateToken(userID string, role string) (string, error)
 	ValidateToken(tokenStr string) (*AppClaims, error)
+	// PublicJWKs returns the current JWK Set for verification keys (empty for HS256).
+	PublicJWKs() (JWKSSet, error)
 }
 
 type jwtService struct {
@@ -214,6 +219,65 @@ func containsAudience(aud jwt.ClaimStrings, target string) bool {
 		}
 	}
 	return false
+}
+
+// --- JWKS (RFC 7517) ---
+
+type JWK struct {
+	Kty string `json:"kty"`
+	Use string `json:"use,omitempty"`
+	Alg string `json:"alg,omitempty"`
+	Kid string `json:"kid,omitempty"`
+	// RSA
+	N string `json:"n,omitempty"`
+	E string `json:"e,omitempty"`
+	// OKP/Ed25519
+	Crv string `json:"crv,omitempty"`
+	X   string `json:"x,omitempty"`
+}
+
+type JWKSSet struct {
+	Keys []JWK `json:"keys"`
+}
+
+func (j *jwtService) PublicJWKs() (JWKSSet, error) {
+	set := JWKSSet{Keys: []JWK{}}
+	switch strings.ToUpper(j.alg) {
+	case "RS256":
+		for kid, pk := range j.rsPublics {
+			if pk == nil {
+				continue
+			}
+			n := base64.RawURLEncoding.EncodeToString(pk.N.Bytes())
+			e := base64.RawURLEncoding.EncodeToString(big.NewInt(int64(pk.E)).Bytes())
+			set.Keys = append(set.Keys, JWK{
+				Kty: "RSA",
+				Use: "sig",
+				Alg: "RS256",
+				Kid: kid,
+				N:   n,
+				E:   e,
+			})
+		}
+	case "EDDSA":
+		for kid, pk := range j.edPublics {
+			if pk == nil {
+				continue
+			}
+			x := base64.RawURLEncoding.EncodeToString([]byte(pk))
+			set.Keys = append(set.Keys, JWK{
+				Kty: "OKP",
+				Use: "sig",
+				Alg: "EdDSA",
+				Kid: kid,
+				Crv: "Ed25519",
+				X:   x,
+			})
+		}
+	default:
+		// HS256 has no public keys; return empty set
+	}
+	return set, nil
 }
 
 // ConfigureAlgorithm sets algorithm, kid, and keys (for RS256/EdDSA). For HS256, ensure hsSecret is set.
