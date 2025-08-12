@@ -11,6 +11,8 @@ type HTTPConfig struct {
 	// Rate limit for login endpoint (RPS and burst)
 	LoginRateLimitRPS   float64 `env:"HTTP_LOGIN_RATELIMIT_RPS" default:"1"`
 	LoginRateLimitBurst int     `env:"HTTP_LOGIN_RATELIMIT_BURST" default:"5"`
+	// When true, Redis rate limiter will deny requests on Redis errors (fail-closed). Default false (fail-open).
+	LoginRateLimitFailClosed bool `env:"HTTP_LOGIN_RATELIMIT_FAIL_CLOSED" default:"false"`
 	// Max body size for JSON requests (bytes)
 	MaxBodyBytes int64 `env:"HTTP_MAX_BODY_BYTES" default:"1048576"`
 }
@@ -35,6 +37,15 @@ type JWTConfig struct {
 	Issuer    string `env:"JWT_ISSUER" default:"app"`
 	Audience  string `env:"JWT_AUDIENCE" default:"app-clients"`
 	LeewaySec int    `env:"JWT_LEEWAY_SEC" default:"30"`
+	// Algorithm: HS256 (default), RS256, EdDSA
+	Alg string `env:"JWT_ALG" default:"HS256"`
+	// Optional key id to attach in JWT header when signing (useful for rotation)
+	KID string `env:"JWT_KID"`
+	// Private key for RS256/EdDSA (PEM content or file path). Prefer path in production.
+	PrivateKeyPath string `env:"JWT_PRIVATE_KEY_PATH"`
+	PrivateKeyPEM  string `env:"JWT_PRIVATE_KEY_PEM"`
+	// Directory containing public key PEM files for verification and rotation. Filename (without extension) is treated as kid.
+	PublicKeysDir string `env:"JWT_PUBLIC_KEYS_DIR"`
 }
 
 type RBACConfig struct {
@@ -76,4 +87,26 @@ type Config struct {
 	RedisAddr     string `env:"REDIS_ADDR"`
 	RedisPassword string `env:"REDIS_PASSWORD"`
 	RedisDB       int    `env:"REDIS_DB" default:"0"`
+
+	// i18n configuration
+	I18nLocalesDir    string `env:"I18N_LOCALES_DIR" default:"configs/locales"`
+	I18nDefaultLocale string `env:"I18N_DEFAULT_LOCALE" default:"en"`
+
+	// Entra ID (Azure AD) OIDC configuration (optional)
+	Entra EntraConfig
+
+	// pgxpool tuning (optional). If unset/non-positive, defaults are applied.
+	PGXMaxConns             int `env:"PGX_MAX_CONNS" default:"0"`
+	PGXMinConns             int `env:"PGX_MIN_CONNS" default:"0"`
+	PGXMaxConnLifetime      int `env:"PGX_CONN_MAX_LIFETIME_SEC" default:"0"`
+	PGXMaxConnIdleTime      int `env:"PGX_CONN_MAX_IDLE_TIME_SEC" default:"0"`
+	PGXHealthCheckPeriodSec int `env:"PGX_HEALTH_CHECK_PERIOD_SEC" default:"0"`
+}
+
+type EntraConfig struct {
+	TenantID     string   `env:"ENTRA_TENANT_ID"`
+	ClientID     string   `env:"ENTRA_CLIENT_ID"`
+	ClientSecret string   `env:"ENTRA_CLIENT_SECRET"`
+	RedirectURL  string   `env:"ENTRA_REDIRECT_URL"`
+	Scopes       []string `env:"ENTRA_SCOPES" envSeparator:"," default:"openid,profile,email,offline_access"`
 }

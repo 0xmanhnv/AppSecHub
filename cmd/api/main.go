@@ -18,8 +18,11 @@ func main() {
 	// Initialize global logger once; other packages can use slog.Default()/logger.L()
 	logger.Init(logger.Options{Level: cfg.LogLevel, Format: "json", AddSource: cfg.Env != "prod"})
 
+	// Load i18n catalogs
+	initI18n(cfg)
+
 	// DB + migrations
-	sqlDB, err := initPostgresAndMigrate(cfg)
+	pool, err := initPostgresAndMigrate(cfg)
 	if err != nil {
 		logger.L().Error("postgres_open_failed", "error", err)
 		os.Exit(1)
@@ -29,8 +32,8 @@ func main() {
 
 	// Optional: seed initial admin user
 	if cfg.Seed.Enable {
-		_, repo, hasher := buildUserComponents(sqlDB, jwtSvc, cfg)
-		if err := seedInitialUser(sqlDB, repo, hasher, cfg); err != nil {
+		_, repo, hasher := buildUserComponents(pool, jwtSvc, cfg)
+		if err := seedInitialUser(pool, repo, hasher, cfg); err != nil {
 			logger.L().Warn("seed_error", "error", err)
 		}
 	}
@@ -39,8 +42,8 @@ func main() {
 	loadRBACPolicy(cfg)
 
 	// HTTP router
-	userHandler, _, _ := buildUserComponents(sqlDB, jwtSvc, cfg)
-	router := buildRouter(cfg, userHandler, jwtSvc, sqlDB)
+	userHandler, _, _ := buildUserComponents(pool, jwtSvc, cfg)
+	router := buildRouter(cfg, userHandler, jwtSvc, pool)
 
 	// HTTP server with timeouts
 	srv := &http.Server{
@@ -71,7 +74,5 @@ func main() {
 	}
 
 	// Close DB connection
-	if err := sqlDB.Close(); err != nil {
-		logger.L().Warn("db_close_error", "error", err)
-	}
+	pool.Close()
 }

@@ -1,6 +1,32 @@
 # AppSecHub
 
-AppSecHub is a Go starter kit for building HTTP services, following a clear layered architecture (Domain → UseCase → Interface/HTTP → Infrastructure) with foundational security practices (password hashing, JWT, migrations, environment-driven config).
+[![Go version](https://img.shields.io/badge/go-1.24+-blue)](https://go.dev)
+[![Build](https://img.shields.io/badge/build-passing-brightgreen)](#)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+AppSecHub is an application security platform to centralize and manage all AppSec concerns across your software portfolio. It provides a clean Go backend foundation (Domain → UseCase → Interface/HTTP → Infrastructure) with strong security defaults (hashed passwords, JWT with `iss`/`aud`/`nbf`/leeway, DB migrations, env-driven config) and is designed to evolve into a full platform.
+
+## Vision & scope
+- Vulnerability management: ingestion, normalization, triage, SLA, dashboards
+- CI/CD security findings: pipeline runs, policy breaches, shift-left workflows
+- Pentest findings: evidence, assignments, dedup across sources
+- Supply chain risks: SCA and container scanning, dependency health
+- SBOM management: CycloneDX/SPDX ingestion, components, licenses, VEX (future)
+- Integrations: SCM/CI (GitHub/GitLab/Jenkins), scanners (SAST/DAST/SCA), Jira/Slack
+
+Initial codebase ships a secure, production-ready skeleton (auth, RBAC, rate limit, logging, CORS, migrations) to accelerate building these modules.
+
+## Initial roadmap
+- Phase 1 (MVP)
+  - Projects/Applications, RBAC/SSO, audit logs
+  - Findings ingestion (SARIF for SAST, CycloneDX for SBOM/SCA), normalization & dedup
+  - Triage workflow (assign/status/SLA), basic dashboards and webhooks
+- Phase 2
+  - DAST/Pentest ingestion (ZAP/Burp), richer integrations (Jira issue sync)
+  - Policy engine (severity remap, gating), advanced reporting/exports
+- Phase 3
+  - Supply chain advanced (VEX, license compliance), external search if needed
+  - Scalability (queues, background jobs), HA/backup, multi-region options
 
 ## Architecture diagrams
 - Project layout (directories): see section "Project layout"
@@ -14,9 +40,11 @@ AppSecHub is a Go starter kit for building HTTP services, following a clear laye
 ```txt
 HTTP Request (Gin)
     ↓
-Base middlewares: JSONRecovery → RequestID → (Logger+SecurityHeaders if enabled) → CORS
+Base middlewares: JSONRecovery → RequestID → (Logger+SecurityHeaders if enabled) → LocaleMiddleware → CORS
     ↓
-Route match (Gin) + optional RateLimit for /v1/auth/login
+Route match (Gin)
+    ├─► (Optional) RateLimit per-IP (in-memory) for /v1/auth/login
+    └─► (Optional) RateLimit per-email (Redis) for /v1/auth/login (applied after ValidateJSON)
     ↓
 Handler (UserHandler)
     ↓
@@ -55,6 +83,12 @@ Handler returns HTTP Response
    - `JWT_AUDIENCE=app-clients` (default)
    - `JWT_LEEWAY_SEC=30`
   - Optional HTTP security & rate limit:
+    - `HTTP_LOGIN_RATELIMIT_RPS=1`
+    - `HTTP_LOGIN_RATELIMIT_BURST=5`
+    - `HTTP_LOGIN_RATELIMIT_FAIL_CLOSED=false` (set `true` to deny on Redis errors)
+  - i18n (validation messages):
+    - `I18N_LOCALES_DIR=configs/locales`
+    - `I18N_DEFAULT_LOCALE=en`
    - `HTTP_SECURITY_HEADERS=true` (enable common security headers; use behind TLS)
    - `HTTP_LOGIN_RATELIMIT_RPS=1`
    - `HTTP_LOGIN_RATELIMIT_BURST=5`
@@ -63,8 +97,8 @@ Handler returns HTTP Response
   - Optional password hashing:
     - `BCRYPT_COST=12` (4–31). Higher = slower = stronger. Tune per env (dev lower for speed, prod higher ~100–250ms/hash target).
   - Optional DB pool tuning:
-    - `DB_MAX_OPEN_CONNS=25`, `DB_MAX_IDLE_CONNS=25`
-    - `DB_CONN_MAX_LIFETIME_SEC=900`, `DB_CONN_MAX_IDLE_TIME_SEC=300`
+    - Legacy (database/sql): `DB_MAX_OPEN_CONNS=25`, `DB_MAX_IDLE_CONNS=25`, `DB_CONN_MAX_LIFETIME_SEC=900`, `DB_CONN_MAX_IDLE_TIME_SEC=300`
+    - pgxpool (current): `PGX_MAX_CONNS`, `PGX_CONN_MAX_LIFETIME_SEC`, `PGX_CONN_MAX_IDLE_TIME_SEC`
   - Optional refresh tokens (feature flag):
     - `AUTH_REFRESH_ENABLED=false` (enable to expose `/v1/auth/refresh` and `/v1/auth/logout`)
     - `REFRESH_TTL_SEC=604800` (7d default; only used when refresh is enabled; controls rotation TTL)
@@ -74,7 +108,7 @@ Handler returns HTTP Response
    - `docker compose -f docker-compose.dev.yml up`
    - Source code is bind-mounted; the app rebuilds automatically on changes.
 2) Local (Go and Air installed):
-   - Install Air: `go install github.com/cosmtrek/air@latest`
+   - Install Air: `go install github.com/air-verse/air@latest`
    - Run: `air -c ./.air.toml`
 
 ### DevEx shortcuts
@@ -82,15 +116,12 @@ Handler returns HTTP Response
   - `make build|run|test|fmt|vet|lint`
   - `make dev-up|dev-down` (compose dev), `make prod-up|prod-down`
   - `make tools` (install Air, golangci-lint)
+  - `make sqlc-gen` (generate sqlc code; auto-run before build/run/test)
 - Linting: configure via `.golangci.yml` (optional in CI).
 
 Default API base URL: `http://localhost:8080`
 
 ## Testing
-
-[![Go version](https://img.shields.io/badge/go-1.24+-blue)](https://go.dev)
-[![Build](https://img.shields.io/badge/build-passing-brightgreen)](#)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ### Unit tests
 - Run all unit tests:
@@ -151,9 +182,23 @@ When `AUTH_REFRESH_ENABLED=true` and Redis configured, the following apply:
 - Set environment variables securely on host/CI (especially `JWT_SECRET`, `DB_PASSWORD`).
 - Do not expose the DB port publicly; keep it on an internal network.
 
-## Database migrations
-- Migrations reside in `migrations/` and run automatically on startup.
-- Optionally manage them with the `golang-migrate` CLI.
+## Database & data access
+- Migrations reside in `migrations/` and run automatically on startup (golang-migrate via pgx stdlib).
+- Data access uses `pgx` + `sqlc`. SQL lives under `internal/infras/storage/postgres/sqlc/` and generates Go code into the same package.
+- Optionally manage migrations with the `golang-migrate` CLI and regenerate code with `sqlc`.
+
+### Using sqlc (code generation)
+- Generated Go files under `internal/infras/storage/postgres/sqlc/*.go` are not committed.
+- Generation is automated in Makefile (pre-build). For manual use:
+  1) Install tool once: `make tools` (installs sqlc)
+  2) Generate: `make sqlc-gen` (or `sqlc generate`)
+
+### pgxpool tuning via env
+- Optional env vars (non-positive = defaults):
+  - `PGX_MAX_CONNS`
+  - `PGX_CONN_MAX_LIFETIME_SEC`
+  - `PGX_CONN_MAX_IDLE_TIME_SEC`
+- Included in `docker-compose.yml` for convenience. Map is applied in `cmd/api/bootstrap.go` → `NewPGXPool`.
 
 ## Sample endpoints
 - `POST /v1/auth/register` – create a new user
@@ -291,7 +336,7 @@ Client
   │                  ├─ Check Authorization header present
   │                  ├─ Extract Bearer token
   │                  ├─ Validate via TokenValidator → JWTService.ValidateToken
-  │                  │     ├─ Verify signature (HS256), iat, exp, nbf(+leeway)
+  │                  │     ├─ Verify signature (HS256/RS256/EdDSA), iat, exp, nbf(+leeway)
   │                  │     ├─ Optional issuer/audience checks
   │                  │     └─ Return claims { sub=user_id, role }
   │                  ├─ Set context: user_id, user_role
@@ -311,12 +356,12 @@ Responses
 ### Composition root wiring (cmd/api)
 ```txt
 config.Load
-  → initPostgresAndMigrate (Build DSN → Run migrations → Open *sql.DB)
+  → initPostgresAndMigrate (Build URL → Run migrations → Open *pgxpool.Pool)
   → initJWTService (infra) then build validator func for middleware
   → (optional) seedInitialUser
   → loadRBACPolicy (YAML)
   → buildUserComponents (repo, hasher, usecases, handlers)
-  → NewRouter(userHandler, cfg, JWTAuth(validator)) + AddReadiness
+    → http.NewRouter(userHandler, cfg, JWTAuth(validator)) + AddReadiness
   → http.Server + graceful shutdown (SIGINT/SIGTERM)
 ```
 
@@ -355,10 +400,11 @@ cmd/api          → all (composition root only)
 
 ## Documentation
 - Codebase review & pending fixes: `docs/review.md`
-- Best-practice starter checklist: `docs/starter-kit-checklist.md`
-  - Step-by-step roadmap: `docs/step-by-step.md`
-  - RBAC policy file example: `configs/rbac.policy.yaml` (configure via `RBAC_POLICY_PATH`)
-  - Authorization usage: include header `Authorization: Bearer <JWT>` for protected routes
+- Best practices (security & ops): `docs/best-practices.md`
+- Validation layers overview: `docs/validation-architecture.md`
+- Internationalization: `docs/i18n.md`
+- RBAC policy file example: `configs/rbac.policy.yaml` (configure via `RBAC_POLICY_PATH`)
+- Authorization usage: include header `Authorization: Bearer <JWT>` for protected routes
 
 ## Rename project/module & keeping up-to-date
 If you start a new project from this starter kit, or want to pull updates later, use the script below.
@@ -374,7 +420,7 @@ go mod tidy && go build ./...
 ```bash
 git remote add upstream <starter-kit-url>
 git fetch upstream
-git merge upstream/dev   # hoặc rebase tuỳ workflow
+git merge upstream/dev   # or rebase depending on your workflow
 
 # If new files from upstream reintroduce old import prefix, run the script again
 ./scripts/rename_project.sh github.com/you/yourapp appsechub
@@ -392,10 +438,19 @@ go mod tidy && go build ./...
 
 ## Security recommendations
 - Password hashing with bcrypt (integrated); increase cost appropriately for production.
-- Manage `JWT_SECRET` with a secret manager; use short TTL; consider refresh tokens/rotation.
+- Manage JWT keys with a secret manager; use short TTL; consider refresh tokens/rotation.
+- JWT algorithms: configurable via `JWT_ALG` (HS256/RS256/EdDSA). When RS256/EdDSA:
+  - Set `JWT_KID` for the signing key; tokens include `typ=JWT` and `kid` header.
+  - Provide private key by `JWT_PRIVATE_KEY_PATH` (or `JWT_PRIVATE_KEY_PEM` for dev) and verification keys under `JWT_PUBLIC_KEYS_DIR` (filename without extension is treated as kid).
+  - Verification enforces the configured algorithm; if multiple public keys are present, KID is required; when a single key exists, fallback is allowed.
+  - Consider exposing a JWKS endpoint for key distribution (planned).
 - Enable CORS appropriately, add security headers (HSTS when HTTPS, X-Content-Type-Options, Referrer-Policy, X-Frame-Options).
 - Content Security Policy (CSP): default applied by middleware: `default-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'`. Adjust per frontend needs.
 - Structured logging with a `request-id`; never log secrets or sensitive data.
+
+### HTTP error envelope
+- 401 Unauthorized via middleware and handlers standardized using `response` helpers; `WWW-Authenticate` header set with error hints.
+- 429 Too Many Requests returns envelope `{ error: { code: "too_many_requests", message: "too many requests" } }` with `Retry-After` and `X-RateLimit-*` headers.
 
 ### Logging guidance
 - Initialize once at entrypoint with `logger.Init(...)` and use `logger.L()` everywhere else.

@@ -4,6 +4,7 @@ import (
 	"appsechub/internal/application/dto"
 	"appsechub/internal/application/usecase/userusecase"
 	domuser "appsechub/internal/domain/user"
+	"appsechub/internal/interfaces/http/middleware"
 	"appsechub/internal/interfaces/http/response"
 	"appsechub/internal/interfaces/http/validation"
 
@@ -13,6 +14,9 @@ import (
 type UserHandler struct{ uc userusecase.UserUsecases }
 
 func NewUserHandler(uc userusecase.UserUsecases) *UserHandler { return &UserHandler{uc: uc} }
+
+// UC exposes the aggregated usecases for advanced wiring (e.g., OIDC handler)
+func (h *UserHandler) UC() userusecase.UserUsecases { return h.uc }
 
 func (h *UserHandler) Register(c *gin.Context) {
 	req := c.MustGet("req").(dto.CreateUserRequest)
@@ -60,7 +64,7 @@ func (h *UserHandler) Refresh(c *gin.Context) {
 		RefreshToken string `json:"refresh_token" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
-		code, msg := validation.MapBindJSONError(err)
+		code, msg := validation.MapBindJSONErrorWithLocale(middleware.GetLocale(c), err)
 		response.BadRequest(c, code, msg)
 		return
 	}
@@ -90,7 +94,7 @@ func (h *UserHandler) Logout(c *gin.Context) {
 		RefreshToken string `json:"refresh_token" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
-		code, msg := validation.MapBindJSONError(err)
+		code, msg := validation.MapBindJSONErrorWithLocale(middleware.GetLocale(c), err)
 		response.BadRequest(c, code, msg)
 		return
 	}

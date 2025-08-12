@@ -12,7 +12,7 @@ import (
 )
 
 // seedInitialUser ensures an initial user exists using values from config.Seed.
-func seedInitialUser(sqlDB any, repo *pgstore.UserRepository, hasher userusecase.PasswordHasher, cfg *config.Config) error {
+func seedInitialUser(_ any, repo *pgstore.UserRepository, hasher userusecase.PasswordHasher, cfg *config.Config) error {
 	// Validate inputs
 	if cfg.Seed.Email == "" || cfg.Seed.Password == "" {
 		logger.L().Warn("seed_skipped_missing_env")
@@ -34,7 +34,10 @@ func seedInitialUser(sqlDB any, repo *pgstore.UserRepository, hasher userusecase
 	if !role.IsValid() {
 		role = domuser.RoleAdmin
 	}
-	hashed := hasher.Hash(cfg.Seed.Password)
+	hashed, err := hasher.Hash(cfg.Seed.Password)
+	if err != nil {
+		return err
+	}
 	u := domuser.NewUser(cfg.Seed.FirstName, cfg.Seed.LastName, emailVO, hashed, role)
 	if err := repo.Save(ctx, u); err != nil {
 		return err
