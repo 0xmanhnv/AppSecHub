@@ -7,9 +7,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"context"
 	"appsechub/internal/application/dto"
 	"appsechub/internal/interfaces/http/handler"
+	"context"
 
 	"github.com/gin-gonic/gin"
 )
@@ -26,6 +26,7 @@ func (ucStub) GetMe(context.Context, string) (*dto.UserResponse, error)         
 func (ucStub) ChangePassword(context.Context, string, dto.ChangePasswordRequest) error { return nil }
 func (ucStub) Refresh(context.Context, string) (*dto.LoginResponse, error)             { return nil, nil }
 func (ucStub) Logout(context.Context, string) error                                    { return nil }
+func (ucStub) LoginOIDC(context.Context, string) (*dto.LoginResponse, error)           { return nil, nil }
 
 func TestLogin_Handler_ExternalPackage(t *testing.T) {
 	gin.SetMode(gin.TestMode)

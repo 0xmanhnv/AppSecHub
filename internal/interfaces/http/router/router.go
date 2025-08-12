@@ -23,6 +23,12 @@ func New(userHandler *handler.UserHandler, cfg *config.Config, authMiddleware ..
 	return r
 }
 
+func registerAPIV1Routes(r *gin.Engine, userHandler *handler.UserHandler, cfg *config.Config, authMiddleware ...gin.HandlerFunc) {
+	v1 := r.Group("/v1")
+	registerAuthRoutes(v1, userHandler, cfg, authMiddleware...)
+	registerAdminRoutes(v1, authMiddleware...)
+}
+
 func applyBaseMiddlewares(r *gin.Engine) {
 	r.Use(middleware.JSONRecovery())
 	r.Use(middleware.RequestID())

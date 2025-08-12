@@ -7,15 +7,10 @@ import (
 	"appsechub/internal/interfaces/http/handler"
 	"appsechub/internal/interfaces/http/middleware"
 	"appsechub/pkg/logger"
+	"context"
 
 	"github.com/gin-gonic/gin"
 )
-
-func registerAPIV1Routes(r *gin.Engine, userHandler *handler.UserHandler, cfg *config.Config, authMiddleware ...gin.HandlerFunc) {
-	v1 := r.Group("/v1")
-	registerAuthRoutes(v1, userHandler, cfg, authMiddleware...)
-	registerAdminRoutes(v1, authMiddleware...)
-}
 
 func registerAuthRoutes(v1 *gin.RouterGroup, userHandler *handler.UserHandler, cfg *config.Config, authMiddleware ...gin.HandlerFunc) {
 	auth := v1.Group("/auth")
@@ -56,6 +51,17 @@ func registerAuthRoutes(v1 *gin.RouterGroup, userHandler *handler.UserHandler, c
 	if cfg.Security.RefreshEnabled {
 		auth.POST("/refresh", userHandler.Refresh)
 		auth.POST("/logout", userHandler.Logout)
+	}
+
+	// Entra ID (Azure AD) OIDC login endpoints (optional wiring if configured)
+	if cfg.Entra.ClientID != "" && cfg.Entra.RedirectURL != "" && cfg.Entra.TenantID != "" {
+		eh, err := handler.NewEntraHandler(context.Background(), cfg, userHandler.UC(), nil)
+		if err != nil {
+			logger.L().Warn("entra_handler_init_failed", "error", err)
+		} else {
+			auth.GET("/entra/login", eh.Login)
+			auth.GET("/entra/callback", eh.Callback)
+		}
 	}
 
 	if len(authMiddleware) > 0 {

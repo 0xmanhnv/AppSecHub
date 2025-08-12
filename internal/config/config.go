@@ -92,10 +92,21 @@ type Config struct {
 	I18nLocalesDir    string `env:"I18N_LOCALES_DIR" default:"configs/locales"`
 	I18nDefaultLocale string `env:"I18N_DEFAULT_LOCALE" default:"en"`
 
+	// Entra ID (Azure AD) OIDC configuration (optional)
+	Entra EntraConfig
+
 	// pgxpool tuning (optional). If unset/non-positive, defaults are applied.
 	PGXMaxConns             int `env:"PGX_MAX_CONNS" default:"0"`
 	PGXMinConns             int `env:"PGX_MIN_CONNS" default:"0"`
 	PGXMaxConnLifetime      int `env:"PGX_CONN_MAX_LIFETIME_SEC" default:"0"`
 	PGXMaxConnIdleTime      int `env:"PGX_CONN_MAX_IDLE_TIME_SEC" default:"0"`
 	PGXHealthCheckPeriodSec int `env:"PGX_HEALTH_CHECK_PERIOD_SEC" default:"0"`
+}
+
+type EntraConfig struct {
+	TenantID     string   `env:"ENTRA_TENANT_ID"`
+	ClientID     string   `env:"ENTRA_CLIENT_ID"`
+	ClientSecret string   `env:"ENTRA_CLIENT_SECRET"`
+	RedirectURL  string   `env:"ENTRA_REDIRECT_URL"`
+	Scopes       []string `env:"ENTRA_SCOPES" envSeparator:"," default:"openid,profile,email,offline_access"`
 }

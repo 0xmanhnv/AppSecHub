@@ -15,6 +15,9 @@ type UserHandler struct{ uc userusecase.UserUsecases }
 
 func NewUserHandler(uc userusecase.UserUsecases) *UserHandler { return &UserHandler{uc: uc} }
 
+// UC exposes the aggregated usecases for advanced wiring (e.g., OIDC handler)
+func (h *UserHandler) UC() userusecase.UserUsecases { return h.uc }
+
 func (h *UserHandler) Register(c *gin.Context) {
 	req := c.MustGet("req").(dto.CreateUserRequest)
 
