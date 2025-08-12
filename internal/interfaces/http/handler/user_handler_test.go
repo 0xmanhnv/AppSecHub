@@ -7,9 +7,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"context"
 	"appsechub/internal/application/dto"
 	"appsechub/internal/application/usecase/userusecase"
+	"context"
 
 	"github.com/gin-gonic/gin"
 )
@@ -28,6 +28,9 @@ func (fakeUserUC) ChangePassword(_ context.Context, _ string, _ dto.ChangePasswo
 }
 func (fakeUserUC) Refresh(_ context.Context, _ string) (*dto.LoginResponse, error) { return nil, nil }
 func (fakeUserUC) Logout(_ context.Context, _ string) error                        { return nil }
+func (fakeUserUC) LoginOIDC(_ context.Context, _ string) (*dto.LoginResponse, error) {
+	return nil, nil
+}
 
 var _ userusecase.UserUsecases = (*fakeUserUC)(nil)
 
