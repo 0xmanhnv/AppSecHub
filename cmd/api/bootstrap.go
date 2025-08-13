@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	assetusecase "appsechub/internal/application/usecase/asset"
 	"appsechub/internal/application/usecase/userusecase"
 	"appsechub/internal/config"
 	authinfra "appsechub/internal/infras/auth"
@@ -12,10 +13,11 @@ import (
 	"appsechub/internal/infras/ratelimit"
 	"appsechub/internal/infras/security"
 	pgstore "appsechub/internal/infras/storage/postgres"
-	httpiface "appsechub/internal/interfaces/http"
+	pstore "appsechub/internal/infras/storage/postgres/sqlc"
 	"appsechub/internal/interfaces/http/apidocs"
 	"appsechub/internal/interfaces/http/handler"
 	"appsechub/internal/interfaces/http/middleware"
+	routerpkg "appsechub/internal/interfaces/http/router"
 	"appsechub/pkg/i18n"
 	"appsechub/pkg/logger"
 	"appsechub/pkg/rbac"
@@ -85,6 +87,14 @@ func buildUserComponents(pool *pgxpool.Pool, jwtSvc security.JWTService, cfg *co
 	return userHandler, userRepo, hasher
 }
 
+// buildAssetComponents wires asset repository and handler.
+func buildAssetComponents(pool *pgxpool.Pool) *handler.AssetHandler {
+	q := pstore.New(pool)
+	repo := pgstore.NewAssetRepository(q)
+	svc := assetusecase.NewService(repo)
+	return handler.NewAssetHandler(svc)
+}
+
 // loadRBACPolicy loads the RBAC policy from YAML if RBAC_POLICY_PATH is set.
 func loadRBACPolicy(cfg *config.Config) {
 	if cfg.RBAC.PolicyPath == "" {
@@ -105,9 +115,15 @@ func buildRouter(cfg *config.Config, userHandler *handler.UserHandler, jwtSvc se
 		}
 		return claims.Subject, claims.Role, nil
 	}
-	router := httpiface.NewRouter(userHandler, cfg, middleware.JWTAuth(validator))
-	ping := infdb.NewDBPingCheck(pool)
-	httpiface.AddReadiness(router, ping)
+	// Build asset handler (DI) then construct router with it
+	assetHandler := buildAssetComponents(pool)
+	router := routerpkg.New(
+		userHandler,
+		cfg,
+		assetHandler,
+		middleware.JWTAuth(validator),
+	)
+	_ = infdb.NewDBPingCheck(pool) // readiness is already registered in router.New()
 	// Optional: swap in Redis-based rate limiter for login when Redis configured
 	if cfg.RedisAddr != "" {
 		rl := ratelimit.NewRedisLimiter(cfg.RedisAddr, cfg.RedisPassword, cfg.RedisDB).WithFailClosed(cfg.HTTP.LoginRateLimitFailClosed)
@@ -118,7 +134,7 @@ func buildRouter(cfg *config.Config, userHandler *handler.UserHandler, jwtSvc se
 	}
 	// API Docs (dev-only)
 	if cfg.Env == "dev" {
-		apidocs.Mount(router)
+		apidocs.RegisterAPIDocsRoutes(router)
 	}
 	return router
 }

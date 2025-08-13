@@ -12,21 +12,27 @@ import (
 )
 
 // New constructs the Gin engine and wires base middlewares and API routes.
-func New(userHandler *handler.UserHandler, cfg *config.Config, authMiddleware ...gin.HandlerFunc) *gin.Engine {
+func New(
+	userHandler *handler.UserHandler,
+	cfg *config.Config,
+	assetHandler *handler.AssetHandler,
+	authMiddleware ...gin.HandlerFunc,
+) *gin.Engine {
 	r := gin.New()
 	applyBaseMiddlewares(r)
 	registerHealthRoutes(r)
 	configureTrustedProxies(r, cfg)
 	attachLoggerAndSecurity(r, cfg)
 	applyCORSFromConfig(r, cfg)
-	registerAPIV1Routes(r, userHandler, cfg, authMiddleware...)
-	return r
-}
 
-func registerAPIV1Routes(r *gin.Engine, userHandler *handler.UserHandler, cfg *config.Config, authMiddleware ...gin.HandlerFunc) {
+	// API v1 group
 	v1 := r.Group("/v1")
-	registerAuthRoutes(v1, userHandler, cfg, authMiddleware...)
-	registerAdminRoutes(v1, authMiddleware...)
+	{
+		registerAuthRoutes(v1, userHandler, cfg, authMiddleware...)
+		registerAdminRoutes(v1, authMiddleware...)
+		RegisterAssetRoutes(v1, assetHandler, authMiddleware...)
+	}
+	return r
 }
 
 func applyBaseMiddlewares(r *gin.Engine) {

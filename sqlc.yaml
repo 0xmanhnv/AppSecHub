@@ -4,8 +4,10 @@ sql:
     schema:
       - "migrations/0001_init.up.sql"
       - "migrations/0002_hardening.up.sql"
+      - "migrations/0003_asset_inventory.up.sql"
     queries:
       - "internal/infras/storage/postgres/sqlc/users.sql"
+      - "internal/infras/storage/postgres/sqlc/assets.sql"
     gen:
       go:
         package: pstore

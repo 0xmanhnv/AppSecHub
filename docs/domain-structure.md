@@ -138,3 +138,89 @@ VO dùng/đề xuất:
 4) `pipeline` + `ticketing/notify`
 
 > Ghi chú: Bắt đầu ít domain, mở rộng khi có use case rõ và bất biến riêng. Tránh gộp domain có vòng đời khác nhau.
+
+## Asset Inventory: Best Practical (Chuẩn thực dụng)
+- Phân loại nhất quán: `AssetType = domain | host | ip | service | application` (enum), `Environment = prod|stg|dev|test`, `Criticality = tier1|tier2|tier3`.
+- Định danh duy nhất theo loại + normalize mạnh, đặt unique constraint:
+  - domain: `normalized_fqdn` (lowercase, punycode, bỏ dấu chấm cuối)
+  - ip: `ip`, `version` (4/6)
+  - host: `cloud_instance_id` hoặc `machine_id`; fallback `hostname@domain`
+  - service: `(host_id, port, protocol)` hoặc `normalized_endpoint`
+  - application: `slug` + `environment` (unique `(slug, environment)`)
+- Lifecycle: `active` → `stale` (không thấy X ngày) → `retired` (xác nhận); tự động hoá stale dựa `last_seen`.
+- Ownership là trung tâm: yêu cầu `owner_team`/`service_owner`; map từ cloud tags, repo/subdir catalog; SLA/risk dựa `Criticality` + `Environment`.
+- Ingestion idempotent + dedupe: mọi collector thực hiện `upsert` theo khoá tự nhiên + `TouchSeen` cập nhật `last_seen`; lưu `source`/`evidence`/`payload_hash` để audit.
+- Quan hệ then chốt: `application(asset)` ↔ N..N `repo` (monorepo bằng `subdir`), `application(asset)` ↔ N `components` (SBOM) unique `(asset_id, purl)`; `asset` ↔ N `findings`.
+
+## Application trong Asset (mở rộng schema DDD)
+- Application là chuyên biệt của `Asset` với `type=application`. Thuộc tính chuyên biệt nên tách về bảng/profile 1–1 để query tốt và không làm nặng bảng `assets`.
+
+### Entities/VOs
+- Asset: giữ như hiện tại (`type`, `environment`, `criticality`, `owner_team`, `first_seen`, `last_seen`, `internet_exposed`, `tags`, `meta`).
+- ApplicationProfile (thuộc context `asset`): `application_id(FK assets.id)`, `slug(unique)`, `display_name`, `project_name` (tên dự án phát triển), `owner_team`, `language`, `framework`, `runtime`, `tags[]`, `meta jsonb`.
+- ApplicationRepo (liên kết với context `sourcecontrol`): `application_id(FK)`, `repo_id(FK)`, `subdir?`, `build_file?`, `default_branch?` với unique `(application_id, repo_id, subdir)`.
+- Components (context `sbom`): giữ như docs hiện tại, gắn theo `asset_id` của application.
+
+### Bất biến (Invariants)
+- ApplicationProfile: 1–1 với `Asset(type=application)`; `slug` unique trong toàn tổ chức.
+- ApplicationRepo: unique `(application_id, repo_id, subdir)` để hỗ trợ monorepo; `subdir` rỗng nghĩa là root.
+- Components: unique `(asset_id, purl)`; component immutable theo `checksum`.
+
+### Data & Migrations (bổ sung)
+- Bổ sung 2 bảng song song với phần "Data & Migrations (MVP)":
+  - `applications`: `(id PK, asset_id unique FK->assets(id), slug unique, display_name, project_name, owner_team, language, framework, runtime, tags text[], meta jsonb, created_at, updated_at)`
+  - `application_repos`: `(application_id FK, repo_id FK, subdir text null, build_file text null, default_branch text null, created_at, updated_at, unique(application_id, repo_id, subdir))`
+
+### Ports & Use Cases
+- Ports (`internal/application/ports/asset`): `ApplicationRepository` quản lý profile + liên kết repo.
+- Use cases (`internal/application/usecase/asset`):
+  - `UpsertApplication` (tạo/cập nhật profile 1–1 cho `Asset(type=application)`).
+  - `LinkApplicationRepo`/`UnlinkApplicationRepo`.
+  - `ListApplications` (filter theo `owner_team`, `language`, `framework`, `repo`, `tag`).
+  - `GetApplicationDetail` (profile + repos + SBOM summary + findings gần nhất).
+- Dòng dữ liệu: `SyncGitLabRepos` (context `sourcecontrol`) để đồng bộ repo, sau đó `LinkApplicationRepo` theo mapping; `ImportCycloneDX` (context `sbom`) ghi `components(asset_id=application_asset_id)`.
+
+### API gợi ý (interfaces/http)
+- `POST /applications` (upsert profile từ `asset_id`), `GET /applications?filters=...`.
+- `POST /applications/:id/repos` (link repo + subdir), `DELETE /applications/:id/repos/:repoId`.
+- `GET /applications/:id` (gộp profile + repos + components summary + findings mới nhất).
+
+## Clean Architecture + DDD Checklist (áp dụng cho dự án)
+- Biên giới import: `interfaces/http` → `application` → `domain`; `infras` → `domain`; chỉ `cmd/api` được wire toàn cục.
+- Domain tối giản: chỉ Entities/VOs/Errors, không dùng framework; validate quy tắc vào VO (email, normalized url, purl, slug).
+- Use cases tinh gọn: stateless, orchestrate ports, không chứa chi tiết adapter.
+- Ports đặt tại `internal/application/ports/<context>`; adapters ở `internal/infras/...`.
+- DTO chỉ sống ở `interfaces/http` và map sang VO/Entity ở handler/usecase.
+- Idempotency: mọi use case write-side là upsert theo khoá tự nhiên; `TouchSeen` cập nhật `last_seen`.
+- Testing: unit VO, unit use case (fake ports), handler tests, integration sqlc+Postgres.
+
+## Roadmap triển khai Clean Architecture + DDD
+1) Khởi tạo kiến trúc
+   - Cấu trúc thư mục như phần "Quy ước kiến trúc"; wire DI tại `cmd/api`.
+   - Thiết lập config, logger, metrics, tracing; chuẩn hoá lỗi domain ↔ HTTP.
+2) Migrations & Repos (MVP)
+   - Tạo tables: `source_controls`, `repos`, `assets`, `applications`, `application_repos`, `components`, `advisories`, `advisory_scores`, `component_vulns`, `findings`.
+   - Sinh code `sqlc` và implement repositories cho `sourcecontrol`, `asset`, `sbom`, `finding`.
+3) Use cases cốt lõi
+   - `sourcecontrol`: `UpsertSourceControl`, `SyncGitLabRepos`.
+   - `asset`: `UpsertAsset`, `ListAssets`, `TouchSeen`, `UpsertApplication`, `LinkApplicationRepo`.
+   - `sbom`: `ImportCycloneDX`, `ListComponents`.
+   - `finding`: `IngestSARIF/Trivy` (giai đoạn sau), `ListFindings`.
+4) Interfaces/HTTP
+   - Handlers + DTO cho list/upsert assets, applications, link repos, list components.
+   - AuthN/AuthZ dựa `identity` (JWT + policies) cho các route.
+5) Observability & Security
+   - Metrics: HTTP, DB pool, ingest latency, stale rate; Tracing pgx.
+   - PII minimization, audit-log append-only cho thay đổi owner/criticality/exposure.
+6) Collectors & Đồng bộ dữ liệu
+   - Collector GitLab/GitHub (repos) → `SyncGitLabRepos`.
+   - SBOM ingest (CycloneDX) gắn `asset_id` application.
+   - DNS/Cert scan để xác định `internet_exposed` cho domain/service.
+7) QA & Triển khai tăng dần
+   - Unit/Integration tests xanh; dashboard sức khỏe inventory (coverage owner/env/stale/exposed).
+   - Rollout theo miền: sourcecontrol → asset/application → sbom → finding.
+
+### Mốc thành công (KPIs)
+- ≥95% `application` có `owner_team` và `environment` hợp lệ.
+- ≤1% bản ghi trùng (theo unique keys); 100% collectors idempotent.
+- Báo cáo stale/retire tự động hoạt động (không false positive quá 5%).

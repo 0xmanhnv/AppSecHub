@@ -6,9 +6,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Mount registers /swagger and /openapi.json under the given router group.
+// RegisterAPIDocsRoutes registers /swagger and /openapi.json under the given router group.
 // Only mount this in dev environments.
-func Mount(r *gin.Engine) {
+func RegisterAPIDocsRoutes(r *gin.Engine) {
 	r.GET("/openapi.json", func(c *gin.Context) {
 		c.Data(http.StatusOK, "application/json", OpenAPISpec)
 	})
