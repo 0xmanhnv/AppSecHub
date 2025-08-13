@@ -5,23 +5,23 @@ import (
 
 	"appsechub/internal/application/dto"
 	"appsechub/internal/application/ports"
-	"appsechub/internal/domain/user"
+	domid "appsechub/internal/domain/identity"
 )
 
 // LoginOIDCUseCase issues local tokens for an existing user identified by email (no password).
 type LoginOIDCUseCase struct {
-	repo              user.Repository
+	repo              domid.Repository
 	jwt               ports.TokenIssuer
 	store             ports.RefreshTokenStore
 	refreshTTLSeconds int
 }
 
-func NewLoginOIDCUseCase(repo user.Repository, jwt ports.TokenIssuer, store ports.RefreshTokenStore, refreshTTLSeconds int) *LoginOIDCUseCase {
+func NewLoginOIDCUseCase(repo domid.Repository, jwt ports.TokenIssuer, store ports.RefreshTokenStore, refreshTTLSeconds int) *LoginOIDCUseCase {
 	return &LoginOIDCUseCase{repo: repo, jwt: jwt, store: store, refreshTTLSeconds: refreshTTLSeconds}
 }
 
 func (uc *LoginOIDCUseCase) Execute(ctx context.Context, email string) (*dto.LoginResponse, error) {
-	emailVO, err := user.NewEmail(email)
+	emailVO, err := domid.NewEmail(email)
 	if err != nil {
 		return nil, err
 	}

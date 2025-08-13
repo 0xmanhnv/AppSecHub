@@ -6,11 +6,11 @@ import (
 	"appsechub/internal/application/apperr"
 	"appsechub/internal/application/dto"
 	"appsechub/internal/application/ports"
-	"appsechub/internal/domain/user"
+	domid "appsechub/internal/domain/identity"
 )
 
 type LoginUserUseCase struct {
-	repo              user.Repository
+	repo              domid.Repository
 	hasher            PasswordHasher
 	jwt               ports.TokenIssuer
 	store             ports.RefreshTokenStore
@@ -18,7 +18,7 @@ type LoginUserUseCase struct {
 }
 
 func (uc *LoginUserUseCase) Execute(ctx context.Context, input dto.LoginRequest) (*dto.LoginResponse, error) {
-	emailVO, err := user.NewEmail(input.Email)
+	emailVO, err := domid.NewEmail(input.Email)
 	if err != nil {
 		return nil, err
 	}

@@ -5,7 +5,7 @@ import (
 
 	"appsechub/internal/application/dto"
 	"appsechub/internal/application/ports"
-	"appsechub/internal/domain/user"
+	domid "appsechub/internal/domain/identity"
 )
 
 // UserUsecases defines the application-facing interface for user-related operations.
@@ -30,7 +30,7 @@ type userUsecasesAggregator struct {
 	refresh  *RefreshUseCase
 }
 
-func NewUserUsecases(repo user.Repository, hasher PasswordHasher, jwt ports.TokenIssuer) UserUsecases {
+func NewUserUsecases(repo domid.Repository, hasher PasswordHasher, jwt ports.TokenIssuer) UserUsecases {
 	return &userUsecasesAggregator{
 		create:   NewCreateUserUseCase(repo, hasher),
 		login:    NewLoginUserUseCase(repo, hasher, jwt, nil),
@@ -41,7 +41,7 @@ func NewUserUsecases(repo user.Repository, hasher PasswordHasher, jwt ports.Toke
 	}
 }
 
-func NewUserUsecasesWithStore(repo user.Repository, hasher PasswordHasher, jwt ports.TokenIssuer, store ports.RefreshTokenStore, refreshTTLSeconds int) UserUsecases {
+func NewUserUsecasesWithStore(repo domid.Repository, hasher PasswordHasher, jwt ports.TokenIssuer, store ports.RefreshTokenStore, refreshTTLSeconds int) UserUsecases {
 	return &userUsecasesAggregator{
 		create:   NewCreateUserUseCase(repo, hasher),
 		login:    &LoginUserUseCase{repo: repo, hasher: hasher, jwt: jwt, store: store, refreshTTLSeconds: refreshTTLSeconds},

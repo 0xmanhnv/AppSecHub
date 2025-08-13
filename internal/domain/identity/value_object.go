@@ -1,21 +1,15 @@
-package user
+package identity
 
 import (
 	appval "appsechub/pkg/validator"
 	"strings"
 )
 
-// Email
+// Email VO
 type Email string
 
-func (e Email) String() string {
-	return string(e)
-}
-
-func (e Email) IsValid() bool {
-	return appval.IsValidEmail(string(e))
-}
-
+func (e Email) String() string { return string(e) }
+func (e Email) IsValid() bool  { return appval.IsValidEmail(string(e)) }
 func NewEmail(s string) (Email, error) {
 	email := Email(strings.TrimSpace(s))
 	if !email.IsValid() {
@@ -24,20 +18,7 @@ func NewEmail(s string) (Email, error) {
 	return email, nil
 }
 
-// Password
-type Password struct {
-	hash string
-}
-
-func NewPassword(hash string) Password {
-	return Password{hash: hash}
-}
-
-func (p Password) String() string {
-	return p.hash
-}
-
-// Role
+// Role VO
 type Role string
 
 const (

@@ -3,7 +3,7 @@ package handler
 import (
 	"appsechub/internal/application/dto"
 	"appsechub/internal/application/usecase/userusecase"
-	domuser "appsechub/internal/domain/user"
+	domid "appsechub/internal/domain/identity"
 	"appsechub/internal/interfaces/http/middleware"
 	"appsechub/internal/interfaces/http/response"
 	"appsechub/internal/interfaces/http/validation"
@@ -24,9 +24,9 @@ func (h *UserHandler) Register(c *gin.Context) {
 	res, err := h.uc.Register(c.Request.Context(), req)
 	if err != nil {
 		switch err {
-		case domuser.ErrEmailAlreadyExists:
+		case domid.ErrEmailAlreadyExists:
 			response.Conflict(c, "email_exists", "email already exists")
-		case domuser.ErrInvalidRole, domuser.ErrInvalidEmail:
+		case domid.ErrInvalidRole, domid.ErrInvalidEmail:
 			response.BadRequest(c, "invalid_request", err.Error())
 		default:
 			response.InternalError(c, "server_error", "internal error")
@@ -126,7 +126,7 @@ func (h *UserHandler) GetMe(c *gin.Context) {
 	res, err := h.uc.GetMe(c.Request.Context(), userID)
 	if err != nil {
 		switch err {
-		case domuser.ErrUserNotFound:
+		case domid.ErrUserNotFound:
 			response.NotFound(c, "not_found", "user not found")
 		default:
 			response.InternalError(c, "server_error", "internal error")
@@ -145,9 +145,9 @@ func (h *UserHandler) ChangePassword(c *gin.Context) {
 	req := c.MustGet("req").(dto.ChangePasswordRequest)
 	if err := h.uc.ChangePassword(c.Request.Context(), userID, req); err != nil {
 		switch err {
-		case domuser.ErrInvalidPassword:
+		case domid.ErrInvalidPassword:
 			response.BadRequest(c, "invalid_current_password", "current password is incorrect")
-		case domuser.ErrUserNotFound:
+		case domid.ErrUserNotFound:
 			response.NotFound(c, "not_found", "user not found")
 		default:
 			response.InternalError(c, "server_error", "internal error")
