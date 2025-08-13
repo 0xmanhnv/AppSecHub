@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	domuser "appsechub/internal/domain/user"
+	domid "appsechub/internal/domain/identity"
 	pstore "appsechub/internal/infras/storage/postgres/sqlc"
 
 	"github.com/google/uuid"
@@ -23,7 +23,7 @@ func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
 	return &UserRepository{pool: pool, q: pstore.New(pool)}
 }
 
-func (r *UserRepository) Save(ctx context.Context, u *domuser.User) error {
+func (r *UserRepository) Save(ctx context.Context, u *domid.User) error {
 	cctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 	err := r.q.CreateUser(cctx, pstore.CreateUserParams{
@@ -40,7 +40,7 @@ func (r *UserRepository) Save(ctx context.Context, u *domuser.User) error {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
 			if pgErr.Code == "23505" { // unique_violation
-				return domuser.ErrEmailAlreadyExists
+				return domid.ErrEmailAlreadyExists
 			}
 		}
 		return err
@@ -48,66 +48,66 @@ func (r *UserRepository) Save(ctx context.Context, u *domuser.User) error {
 	return nil
 }
 
-func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*domuser.User, error) {
+func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*domid.User, error) {
 	cctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 	row, err := r.q.GetUserByID(cctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domuser.ErrUserNotFound
+			return nil, domid.ErrUserNotFound
 		}
 		return nil, err
 	}
-	return &domuser.User{
+	return &domid.User{
 		ID:        row.ID,
 		FirstName: row.FirstName,
 		LastName:  row.LastName,
-		Email:     domuser.Email(row.Email),
+		Email:     domid.Email(row.Email),
 		Password:  row.Password,
-		Role:      domuser.Role(row.Role),
+		Role:      domid.Role(row.Role),
 		CreatedAt: row.CreatedAt,
 		UpdatedAt: row.UpdatedAt,
 	}, nil
 }
 
-func (r *UserRepository) GetByEmail(ctx context.Context, email domuser.Email) (*domuser.User, error) {
+func (r *UserRepository) GetByEmail(ctx context.Context, email domid.Email) (*domid.User, error) {
 	cctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 	row, err := r.q.GetUserByEmail(cctx, email.String())
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domuser.ErrUserNotFound
+			return nil, domid.ErrUserNotFound
 		}
 		return nil, err
 	}
-	return &domuser.User{
+	return &domid.User{
 		ID:        row.ID,
 		FirstName: row.FirstName,
 		LastName:  row.LastName,
-		Email:     domuser.Email(row.Email),
+		Email:     domid.Email(row.Email),
 		Password:  row.Password,
-		Role:      domuser.Role(row.Role),
+		Role:      domid.Role(row.Role),
 		CreatedAt: row.CreatedAt,
 		UpdatedAt: row.UpdatedAt,
 	}, nil
 }
 
-func (r *UserRepository) GetAll(ctx context.Context) ([]*domuser.User, error) {
+func (r *UserRepository) GetAll(ctx context.Context) ([]*domid.User, error) {
 	cctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	rows, err := r.q.ListUsers(cctx)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]*domuser.User, 0, len(rows))
+	out := make([]*domid.User, 0, len(rows))
 	for _, row := range rows {
-		u := &domuser.User{
+		u := &domid.User{
 			ID:        row.ID,
 			FirstName: row.FirstName,
 			LastName:  row.LastName,
-			Email:     domuser.Email(row.Email),
+			Email:     domid.Email(row.Email),
 			Password:  row.Password,
-			Role:      domuser.Role(row.Role),
+			Role:      domid.Role(row.Role),
 			CreatedAt: row.CreatedAt,
 			UpdatedAt: row.UpdatedAt,
 		}
@@ -116,7 +116,7 @@ func (r *UserRepository) GetAll(ctx context.Context) ([]*domuser.User, error) {
 	return out, nil
 }
 
-func (r *UserRepository) Update(ctx context.Context, u *domuser.User) error {
+func (r *UserRepository) Update(ctx context.Context, u *domid.User) error {
 	cctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 	return r.q.UpdateUser(cctx, pstore.UpdateUserParams{

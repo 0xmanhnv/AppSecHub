@@ -88,3 +88,6 @@ wire_gen.go
 
 # Local development
 local/ 
+
+# Old projects
+old*

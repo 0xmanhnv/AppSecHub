@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"appsechub/internal/application/apperr"
-	domuser "appsechub/internal/domain/user"
+	domid "appsechub/internal/domain/identity"
 )
 
 func TestFromError_Mapping(t *testing.T) {
@@ -15,8 +15,8 @@ func TestFromError_Mapping(t *testing.T) {
 	}{
 		{apperr.ErrInvalidCredentials, 401},
 		{apperr.ErrInvalidRefreshToken, 401},
-		{domuser.ErrUserNotFound, 404},
-		{domuser.ErrEmailAlreadyExists, 409},
+		{domid.ErrUserNotFound, 404},
+		{domid.ErrEmailAlreadyExists, 409},
 		{errors.New("x"), 500},
 	}
 	for _, c := range cases {

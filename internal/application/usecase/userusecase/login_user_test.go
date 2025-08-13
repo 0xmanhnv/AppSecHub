@@ -7,25 +7,25 @@ import (
 
 	"appsechub/internal/application/dto"
 	"appsechub/internal/application/ports"
-	domuser "appsechub/internal/domain/user"
+	domid "appsechub/internal/domain/identity"
 
 	"github.com/google/uuid"
 )
 
-type fakeRepo struct{ user *domuser.User }
+type fakeRepo struct{ user *domid.User }
 
-func (f *fakeRepo) Save(ctx context.Context, u *domuser.User) error { f.user = u; return nil }
-func (f *fakeRepo) GetByID(ctx context.Context, id uuid.UUID) (*domuser.User, error) {
+func (f *fakeRepo) Save(ctx context.Context, u *domid.User) error { f.user = u; return nil }
+func (f *fakeRepo) GetByID(ctx context.Context, id uuid.UUID) (*domid.User, error) {
 	return f.user, nil
 }
-func (f *fakeRepo) GetByEmail(ctx context.Context, email domuser.Email) (*domuser.User, error) {
+func (f *fakeRepo) GetByEmail(ctx context.Context, email domid.Email) (*domid.User, error) {
 	return f.user, nil
 }
-func (f *fakeRepo) GetAll(ctx context.Context) ([]*domuser.User, error) {
-	return []*domuser.User{f.user}, nil
+func (f *fakeRepo) GetAll(ctx context.Context) ([]*domid.User, error) {
+	return []*domid.User{f.user}, nil
 }
-func (f *fakeRepo) Update(ctx context.Context, u *domuser.User) error { f.user = u; return nil }
-func (f *fakeRepo) Delete(ctx context.Context, id uuid.UUID) error    { return nil }
+func (f *fakeRepo) Update(ctx context.Context, u *domid.User) error { f.user = u; return nil }
+func (f *fakeRepo) Delete(ctx context.Context, id uuid.UUID) error  { return nil }
 
 type fakeHasher struct{}
 
@@ -64,7 +64,7 @@ var _ ports.TokenIssuer = (*fakeTokenIssuer)(nil)
 func TestLoginUserUseCase_Success(t *testing.T) {
 	// Arrange
 	uid := uuid.New()
-	u := &domuser.User{ID: uid, FirstName: "John", LastName: "Doe", Email: domuser.Email("john@example.com"), Password: "hashed:pass", Role: domuser.Role("user"), CreatedAt: time.Now()}
+	u := &domid.User{ID: uid, FirstName: "John", LastName: "Doe", Email: domid.Email("john@example.com"), Password: "hashed:pass", Role: domid.Role("user"), CreatedAt: time.Now()}
 	repo := &fakeRepo{user: u}
 	hasher := fakeHasher{}
 	jwt := fakeTokenIssuer{}
@@ -91,7 +91,7 @@ func TestLoginUserUseCase_Success(t *testing.T) {
 
 func TestLoginUserUseCase_InvalidPassword(t *testing.T) {
 	uid := uuid.New()
-	u := &domuser.User{ID: uid, FirstName: "John", LastName: "Doe", Email: domuser.Email("john@example.com"), Password: "hashed:pass", Role: domuser.Role("user"), CreatedAt: time.Now()}
+	u := &domid.User{ID: uid, FirstName: "John", LastName: "Doe", Email: domid.Email("john@example.com"), Password: "hashed:pass", Role: domid.Role("user"), CreatedAt: time.Now()}
 	repo := &fakeRepo{user: u}
 	hasher := fakeHasher{}
 	jwt := fakeTokenIssuer{}

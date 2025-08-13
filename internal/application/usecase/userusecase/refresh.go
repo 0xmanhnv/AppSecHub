@@ -7,14 +7,14 @@ import (
 	"appsechub/internal/application/apperr"
 	"appsechub/internal/application/dto"
 	"appsechub/internal/application/ports"
-	"appsechub/internal/domain/user"
+	domid "appsechub/internal/domain/identity"
 
 	"github.com/google/uuid"
 )
 
 // RefreshUseCase handles refresh token rotation and access token issuance.
 type RefreshUseCase struct {
-	repo  user.Repository
+	repo  domid.Repository
 	jwt   ports.TokenIssuer
 	store ports.RefreshTokenStore
 	// refreshTTLSeconds controls how long newly issued refresh tokens live.
@@ -22,11 +22,11 @@ type RefreshUseCase struct {
 	refreshTTLSeconds int
 }
 
-func NewRefreshUseCase(repo user.Repository, jwt ports.TokenIssuer) *RefreshUseCase {
+func NewRefreshUseCase(repo domid.Repository, jwt ports.TokenIssuer) *RefreshUseCase {
 	return &RefreshUseCase{repo: repo, jwt: jwt}
 }
 
-func NewRefreshUseCaseWithStore(repo user.Repository, jwt ports.TokenIssuer, store ports.RefreshTokenStore, refreshTTLSeconds int) *RefreshUseCase {
+func NewRefreshUseCaseWithStore(repo domid.Repository, jwt ports.TokenIssuer, store ports.RefreshTokenStore, refreshTTLSeconds int) *RefreshUseCase {
 	return &RefreshUseCase{repo: repo, jwt: jwt, store: store, refreshTTLSeconds: refreshTTLSeconds}
 }
 

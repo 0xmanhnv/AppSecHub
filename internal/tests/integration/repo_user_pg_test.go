@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	domuser "appsechub/internal/domain/user"
+	domid "appsechub/internal/domain/identity"
 	infdb "appsechub/internal/infras/db"
 	pgstore "appsechub/internal/infras/storage/postgres"
 
@@ -48,8 +48,8 @@ func TestPostgres_UserRepository_CRUD(t *testing.T) {
 	repo := pgstore.NewUserRepository(pool)
 
 	// Create user
-	email, _ := domuser.NewEmail("it@example.com")
-	u := domuser.NewUser("It", "Test", email, "hashed:pass", domuser.RoleUser)
+	email, _ := domid.NewEmail("it@example.com")
+	u := domid.NewUser("It", "Test", email, "hashed:pass", domid.RoleUser)
 	if err := repo.Save(ctx, u); err != nil {
 		t.Fatalf("save user: %v", err)
 	}

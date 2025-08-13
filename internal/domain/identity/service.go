@@ -1,7 +1,6 @@
-package user
+package identity
 
 import "errors"
-
 
 func ValidateUser(u *User) error {
 	if !u.Role.IsValid() {
